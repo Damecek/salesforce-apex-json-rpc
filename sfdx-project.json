@@ -1,12 +1,21 @@
 {
   "packageDirectories": [
     {
+      "versionName": "ver 0.1",
+      "versionNumber": "0.1.0.NEXT",
       "path": "force-app",
-      "default": true
+      "default": true,
+      "package": "ApexJsonRpc",
+      "versionDescription": "Apex JSON-RPC 2.0 protocol library",
+      "definitionFile": "config/package-version-def.json"
     }
   ],
   "name": "salesforce-apex-json-rpc",
   "namespace": "",
   "sfdcLoginUrl": "https://login.salesforce.com",
-  "sourceApiVersion": "65.0"
+  "sourceApiVersion": "65.0",
+  "packageAliases": {
+    "ApexJsonRpc": "0Hofj0000001TJJCA2",
+    "ApexJsonRpc@0.1.0-1": "04tfj000000FXLRAA4"
+  }
 }

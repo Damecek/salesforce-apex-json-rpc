@@ -1,18 +1,72 @@
-# Salesforce DX Project: Next Steps
+# Apex JSON-RPC 2.0 (Salesforce 2GP)
 
-Now that you’ve created a Salesforce DX project, what’s next? Here are some documentation resources to get you started.
+Minimal Apex library implementing **JSON-RPC 2.0 protocol semantics only**.
 
-## How Do You Plan to Deploy Your Changes?
+## Scope
+- Request/notification parsing and validation.
+- Response/error modeling and serialization.
+- Batch parsing behavior, including empty-batch invalid request handling.
+- Standard JSON-RPC error codes (`-32700`, `-32600`, `-32601`, `-32602`, `-32603`).
 
-Do you want to deploy a set of changes, or create a self-contained application? Choose a [development model](https://developer.salesforce.com/tools/vscode/en/user-guide/development-models).
+Out of scope: HTTP endpoints, auth, transport adapters, business method handlers.
 
-## Configure Your Salesforce DX Project
+## Quick Start
+```bash
+npm run org:fresh
+npm run org:deploy
+npm run org:test
+```
 
-The `sfdx-project.json` file contains useful configuration information for your project. See [Salesforce DX Project Configuration](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_ws_config.htm) in the _Salesforce DX Developer Guide_ for details about this file.
+Default Dev Hub alias is `apex-json-rpc-devhub` (override via `DEVHUB_ALIAS`).
 
-## Read All About It
+## Usage (Apex)
+```apex
+JsonRpcRequest req = new JsonRpcRequest('sum', 1);
+req.params = new List<Object>{1, 2};
+req.validate();
 
-- [Salesforce Extensions Documentation](https://developer.salesforce.com/tools/vscode/)
-- [Salesforce CLI Setup Guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_intro.htm)
-- [Salesforce DX Developer Guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_intro.htm)
-- [Salesforce CLI Command Reference](https://developer.salesforce.com/docs/atlas.en-us.sfdx_cli_reference.meta/sfdx_cli_reference/cli_reference.htm)
+String requestJson = JSON.serialize(req.toMap());
+JsonRpcProtocol.ParseResult parsed = JsonRpcProtocol.parseRequest(requestJson);
+
+JsonRpcResponse ok = JsonRpcResponse.success(1, 3);
+String responseJson = JsonRpcProtocol.serializeResponse(ok);
+```
+
+Notification example:
+```apex
+JsonRpcRequest notification = new JsonRpcRequest('updateStatus');
+notification.params = new Map<String, Object>{ 'status' => 'ok' };
+System.assert(notification.isNotification());
+```
+
+## Scratch-Org-First Policy
+Each new task should start with a fresh scratch org by default:
+```bash
+npm run task:prepare
+```
+
+Explicit local override:
+```bash
+npm run task:prepare:skip-org
+```
+
+## 2GP Packaging
+Create package in Dev Hub (idempotent):
+```bash
+npm run package:init
+```
+
+Create version:
+```bash
+npm run release:version
+```
+
+Promote/install (requires `PACKAGE_VERSION_ID`):
+```bash
+npm run release:promote
+npm run release:install
+```
+
+## Compatibility
+- Salesforce API version: `65.0`
+- Namespace: empty (no-namespace start)

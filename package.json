@@ -1,0 +1,18 @@
+{
+  "name": "salesforce-apex-json-rpc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Apex JSON-RPC 2.0 protocol library packaged as Salesforce 2GP.",
+  "scripts": {
+    "org:fresh": "./scripts/org-fresh.sh",
+    "org:deploy": "./scripts/org-deploy.sh",
+    "org:test": "./scripts/org-test.sh",
+    "task:prepare": "./scripts/task-prepare.sh",
+    "task:prepare:skip-org": "./scripts/task-prepare-skip-org.sh",
+    "validate": "./scripts/validate.sh",
+    "package:init": "./scripts/package-init.sh",
+    "release:version": "./scripts/release-version.sh",
+    "release:promote": "./scripts/release-promote.sh",
+    "release:install": "./scripts/release-install.sh"
+  }
+}
