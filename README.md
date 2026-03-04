@@ -1,14 +1,14 @@
-# Apex JSON-RPC 2.0 (Salesforce 2GP)
+# Apex JSON-RPC Framework (Salesforce 2GP)
 
-Minimal Apex library implementing **JSON-RPC 2.0 protocol semantics only**.
+Feature-full Apex framework for JSON-RPC 2.0 service execution with explicit method registration and typed DTO contracts.
 
 ## Scope
-- Request/notification parsing and validation.
-- Response/error modeling and serialization.
-- Batch parsing behavior, including empty-batch invalid request handling.
-- Standard JSON-RPC error codes (`-32700`, `-32600`, `-32601`, `-32602`, `-32603`).
+- JSON-RPC 2.0 runtime execution for single requests, notifications, and batches.
+- Typed params/result pipeline using base DTO classes.
+- Built-in error mapping with extension point.
+- Transport-neutral API (no HTTP endpoint implementation in this package).
 
-Out of scope: HTTP endpoints, auth, transport adapters, business method handlers.
+Out of scope: `@RestResource` endpoints, auth, UI, business domain logic.
 
 ## Quick Start
 ```bash
@@ -21,23 +21,50 @@ Default Dev Hub alias is `apex-json-rpc-devhub` (override via `DEVHUB_ALIAS`).
 
 ## Usage (Apex)
 ```apex
-JsonRpcRequest req = new JsonRpcRequest('sum', 1);
-req.params = new List<Object>{1, 2};
-req.validate();
+public class SumParams extends JsonRpcParamsBase {
+    public Integer a;
+    public Integer b;
 
-String requestJson = JSON.serialize(req.toMap());
-JsonRpcProtocol.ParseResult parsed = JsonRpcProtocol.parseRequest(requestJson);
+    public override void validate() {
+        if (a == null || b == null) {
+            throw new JsonRpcException('a and b are required.');
+        }
+    }
+}
 
-JsonRpcResponse ok = JsonRpcResponse.success(1, 3);
-String responseJson = JsonRpcProtocol.serializeResponse(ok);
+public class SumResult extends JsonRpcResultBase {
+    public Integer sum;
+}
+
+public class SumHandler implements JsonRpcMethodHandler {
+    public String methodName() { return 'math.sum'; }
+    public Type paramsType() { return SumParams.class; }
+    public Type resultType() { return SumResult.class; }
+
+    public Object invoke(Object params, JsonRpcInvocationContext context) {
+        SumParams typed = (SumParams) params;
+        SumResult result = new SumResult();
+        result.sum = typed.a + typed.b;
+        return result;
+    }
+}
+
+JsonRpcModule module = new JsonRpcModule().register(new SumHandler());
+JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute(
+    '{"jsonrpc":"2.0","method":"math.sum","params":{"a":1,"b":2},"id":1}',
+    module
+);
+
+String responseJson = execResult.toJson();
 ```
 
-Notification example:
-```apex
-JsonRpcRequest notification = new JsonRpcRequest('updateStatus');
-notification.params = new Map<String, Object>{ 'status' => 'ok' };
-System.assert(notification.isNotification());
-```
+## Examples
+See the [`examples/`](examples) folder for practical snippets:
+- `minimal-module.apex`
+- `batch-mixed.apex`
+- `custom-exception-mapper.apex`
+- `method-not-found-and-invalid-request.apex`
+- `testing-handler.apex`
 
 ## Scratch-Org-First Policy
 Each new task should start with a fresh scratch org by default:
@@ -70,3 +97,4 @@ npm run release:install
 ## Compatibility
 - Salesforce API version: `65.0`
 - Namespace: empty (no-namespace start)
+- Package version line: `1.0.0`

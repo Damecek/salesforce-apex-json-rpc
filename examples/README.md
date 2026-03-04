@@ -1,8 +1,10 @@
 # Usage Examples
 
-This folder contains minimal, copy-paste friendly examples for common JSON-RPC 2.0 flows in Apex.
+This folder contains copy-paste friendly examples for the framework-first JSON-RPC API.
 
 ## Files
-- `request-response.apex`: Single request parse and success response serialization.
-- `batch-processing.apex`: Batch parse handling with item-level invalid request responses.
-- `notification-and-errors.apex`: Notification behavior and standard error response creation.
+- `minimal-module.apex`: One DTO pair, one handler, one module registration, one execution call.
+- `batch-mixed.apex`: Batch with success, invalid params, notification, and malformed item.
+- `custom-exception-mapper.apex`: Runtime options with custom exception mapper.
+- `method-not-found-and-invalid-request.apex`: Standard method-not-found and invalid request behavior.
+- `testing-handler.apex`: Unit and integration testing pattern for handlers/runtime.

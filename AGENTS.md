@@ -24,6 +24,7 @@ Override is explicit: `npm run task:prepare:skip-org`.
 - Keep public API minimal and intuitive.
 - Follow JSON-RPC 2.0 spec strictly.
 - Add/update tests with every behavior change.
+- Keep ApexDoc complete and accurate for every public API class, method, and field.
 - Keep docs concise and executable.
 - Use script-first operations for consistency.
 

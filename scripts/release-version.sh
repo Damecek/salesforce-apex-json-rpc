@@ -3,8 +3,8 @@ set -euo pipefail
 
 DEVHUB_ALIAS="${DEVHUB_ALIAS:-apex-json-rpc-devhub}"
 PACKAGE_NAME="${PACKAGE_NAME:-ApexJsonRpc}"
-VERSION_NAME="${VERSION_NAME:-v0.1}"
-VERSION_DESC="${VERSION_DESC:-JSON-RPC 2.0 Apex core}"
+VERSION_NAME="${VERSION_NAME:-v1.0.0}"
+VERSION_DESC="${VERSION_DESC:-JSON-RPC 2.0 Apex framework runtime}"
 
 ./scripts/validate.sh
 
