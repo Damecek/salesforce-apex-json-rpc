@@ -1,12 +1,12 @@
 {
   "packageDirectories": [
     {
-      "versionName": "ver 0.1",
-      "versionNumber": "0.1.0.NEXT",
+      "versionName": "ver 1.0",
+      "versionNumber": "1.0.0.NEXT",
       "path": "force-app",
       "default": true,
       "package": "ApexJsonRpc",
-      "versionDescription": "Apex JSON-RPC 2.0 protocol library",
+      "versionDescription": "Apex JSON-RPC 2.0 framework runtime",
       "definitionFile": "config/package-version-def.json"
     }
   ],

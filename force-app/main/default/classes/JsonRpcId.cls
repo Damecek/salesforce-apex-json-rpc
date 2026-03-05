@@ -1,9 +1,12 @@
+/**
+ * Utilities for JSON-RPC id type checks and normalization.
+ */
 public inherited sharing class JsonRpcId {
     /**
-     * Returns true when the supplied value is a JSON-RPC 2.0 supported id type.
+     * Checks whether a value is a valid JSON-RPC id type.
      *
      * @param value Candidate id value.
-     * @return True when value is String, Integer, Long, Decimal, or null.
+     * @return True when value is null, String, Integer, Long, or Decimal.
      */
     public static Boolean isSupported(Object value) {
         if (value == null) {
@@ -17,10 +20,10 @@ public inherited sharing class JsonRpcId {
     }
 
     /**
-     * Returns the value when it is a supported id type, otherwise returns null.
+     * Returns the id when supported; otherwise returns null.
      *
      * @param value Candidate id value.
-     * @return Normalized id value or null for unsupported types.
+     * @return Supported id value, or null when unsupported.
      */
     public static Object normalizedOrNull(Object value) {
         return isSupported(value) ? value : null;
