@@ -21,9 +21,15 @@ public inherited sharing class JsonRpcServiceRuntime {
     }
 
     /**
-     * Wrapper exception used for params/result conversion and validation errors.
+     * Wrapper exception used for parameter conversion and validation errors.
      */
     public class InvalidParamsException extends Exception {
+    }
+
+    /**
+     * Wrapper exception used for server-side execution/result handling errors.
+     */
+    public class InternalErrorException extends Exception {
     }
 
     private class RequestEnvelope {
@@ -228,13 +234,17 @@ public inherited sharing class JsonRpcServiceRuntime {
             throw new InvalidRequestException('Declared params type must extend JsonRpcParamsBase.');
         }
 
-        ((JsonRpcParamsBase) typedParams).validate();
+        try {
+            ((JsonRpcParamsBase) typedParams).validate();
+        } catch (Exception ex) {
+            throw new InvalidParamsException('Params validation failed for declared params type.');
+        }
         return typedParams;
     }
 
     private static Object coerceResult(Object rawResult, Type resultType) {
         if (resultType == null) {
-            throw new InvalidRequestException('handler resultType() must return a type.');
+            throw new InternalErrorException('handler resultType() must return a type.');
         }
 
         if (rawResult == null) {
@@ -245,14 +255,18 @@ public inherited sharing class JsonRpcServiceRuntime {
         try {
             typedResult = JSON.deserialize(JSON.serialize(rawResult), resultType);
         } catch (Exception ex) {
-            throw new InvalidParamsException('Unable to serialize handler result into declared result type.');
+            throw new InternalErrorException('Unable to serialize handler result into declared result type.');
         }
 
         if (!(typedResult instanceof JsonRpcResultBase)) {
-            throw new InvalidRequestException('Declared result type must extend JsonRpcResultBase.');
+            throw new InternalErrorException('Declared result type must extend JsonRpcResultBase.');
         }
 
-        ((JsonRpcResultBase) typedResult).validate();
+        try {
+            ((JsonRpcResultBase) typedResult).validate();
+        } catch (Exception ex) {
+            throw new InternalErrorException('Result validation failed for declared result type.');
+        }
         return typedResult;
     }
 

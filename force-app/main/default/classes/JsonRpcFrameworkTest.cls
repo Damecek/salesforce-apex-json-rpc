@@ -112,6 +112,24 @@ private class JsonRpcFrameworkTest {
         }
     }
 
+    private class JsonRpcExceptionThrowingHandler implements JsonRpcMethodHandler {
+        public String methodName() {
+            return 'system.throwJsonRpc';
+        }
+
+        public Type paramsType() {
+            return PingParams.class;
+        }
+
+        public Type resultType() {
+            return PingResult.class;
+        }
+
+        public Object invoke(Object params, JsonRpcInvocationContext context) {
+            throw new JsonRpcException('handler-signaled-error');
+        }
+    }
+
     private class DomainException extends Exception {
     }
 
@@ -345,6 +363,18 @@ private class JsonRpcFrameworkTest {
 
         JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute('{"jsonrpc":"2.0","method":"system.badResult","params":{},"id":5}', module);
 
-        System.assertEquals(JsonRpcConstants.INVALID_PARAMS_CODE, execResult.responses[0].error.code);
+        System.assertEquals(JsonRpcConstants.INTERNAL_ERROR_CODE, execResult.responses[0].error.code);
+    }
+
+    @IsTest
+    static void testHandlerJsonRpcExceptionMapsToInternalError() {
+        JsonRpcModule module = new JsonRpcModule().register(new JsonRpcExceptionThrowingHandler());
+
+        JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute(
+            '{"jsonrpc":"2.0","method":"system.throwJsonRpc","params":{},"id":6}',
+            module
+        );
+
+        System.assertEquals(JsonRpcConstants.INTERNAL_ERROR_CODE, execResult.responses[0].error.code);
     }
 }
