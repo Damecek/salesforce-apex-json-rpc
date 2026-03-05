@@ -45,10 +45,6 @@ public inherited sharing class DefaultJsonRpcExceptionMapper implements JsonRpcE
             return JsonRpcError.invalidParams(ex.getMessage());
         }
 
-        if (ex instanceof JsonRpcException) {
-            return JsonRpcError.invalidParams(ex.getMessage());
-        }
-
         if (this.includeInternalErrorDetails) {
             return JsonRpcError.internalError(ex.getMessage());
         }
