@@ -16,6 +16,7 @@
   "sourceApiVersion": "65.0",
   "packageAliases": {
     "ApexJsonRpc": "0Hofj0000001TJJCA2",
-    "ApexJsonRpc@0.1.0-1": "04tfj000000FXLRAA4"
+    "ApexJsonRpc@0.1.0-1": "04tfj000000FXLRAA4",
+    "ApexJsonRpc@1.0.0-1": "04tfj000000Fw0TAAS"
   }
 }
