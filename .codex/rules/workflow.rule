@@ -1,0 +1,8 @@
+prefix_rule(
+    pattern = ["npm", "run", ["org:fresh", "org:deploy", "org:test", "task:prepare", "task:prepare:skip-org", "validate", "package:init", "release:version", "release:promote", "release:install"]],
+    decision = "allow",
+)
+prefix_rule(
+    pattern = ["./scripts", ["org-fresh.sh", "org-deploy.sh", "org-test.sh", "task-prepare.sh", "task-prepare-skip-org.sh", "validate.sh", "package-init.sh", "release-version.sh", "release-promote.sh", "release-install.sh"]],
+    decision = "allow",
+)

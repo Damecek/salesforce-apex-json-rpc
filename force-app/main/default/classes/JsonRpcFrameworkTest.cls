@@ -405,6 +405,46 @@ private class JsonRpcFrameworkTest {
     }
 
     @IsTest
+    static void testBatchMcpLikePayloadProducesMethodNotFoundPerItem() {
+        JsonRpcModule module = new TestModuleBuilder().build();
+        String batch = '[' +
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}},' +
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}},' +
+            '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"opportunity.fetch_with_assets","arguments":{"opportunityId":"006AP00000StfLlYAJ"}}},' +
+            '{"jsonrpc":"2.0","id":4,"method":"resources/read","params":{"uri":"mcp://opportunity-assets/schema"}},' +
+            '{"jsonrpc":"2.0","id":5,"method":"prompts/get","params":{"name":"opportunity.customer_reply_draft","arguments":{"opportunityId":"006AP00000StfLlYAJ","tone":"friendly"}}}' +
+            ']';
+
+        JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute(batch, module);
+
+        System.assertEquals(true, execResult.isBatch);
+        System.assertEquals(true, execResult.hasResponse);
+        System.assertEquals(5, execResult.responses.size());
+
+        for (Integer i = 0; i < execResult.responses.size(); i++) {
+            JsonRpcResponse response = execResult.responses[i];
+            Integer expectedId = i + 1;
+
+            System.assertEquals(true, response.hasError);
+            System.assertEquals(false, response.hasResult);
+            System.assertEquals(expectedId, response.id);
+            System.assertEquals(JsonRpcConstants.METHOD_NOT_FOUND_CODE, response.error.code);
+        }
+
+        List<Object> serialized = (List<Object>) JSON.deserializeUntyped(execResult.toJson());
+        System.assertEquals(5, serialized.size());
+
+        for (Integer i = 0; i < serialized.size(); i++) {
+            Map<String, Object> response = (Map<String, Object>) serialized[i];
+            Map<String, Object> error = (Map<String, Object>) response.get('error');
+            Integer expectedId = i + 1;
+
+            System.assertEquals(expectedId, ((Decimal) response.get('id')).intValue());
+            System.assertEquals(JsonRpcConstants.METHOD_NOT_FOUND_CODE, ((Decimal) error.get('code')).intValue());
+        }
+    }
+
+    @IsTest
     static void testEmptyBatchInvalidRequest() {
         JsonRpcModule module = new TestModuleBuilder().build();
 
