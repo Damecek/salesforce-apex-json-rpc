@@ -58,6 +58,9 @@ JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute(
 String responseJson = execResult.toJson();
 ```
 
+For fixed request schemas, plain DTO fields are enough and the runtime will deserialize them automatically.
+For dynamic nested payloads such as `Map<String, Object>` or `List<Object>`, implement `JsonRpcRawParamsDecoder` on the params DTO and populate the DTO from the raw untyped `params` payload yourself before `validate()` runs.
+
 ## Examples
 See the [`examples/`](examples) folder for practical snippets:
 - `minimal-module.apex`

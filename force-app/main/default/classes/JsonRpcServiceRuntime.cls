@@ -221,9 +221,11 @@ public inherited sharing class JsonRpcServiceRuntime {
 
         Object typedParams;
         try {
-            if (rawParams == null) {
-                typedParams = paramsType.newInstance();
-            } else {
+            typedParams = paramsType.newInstance();
+
+            if (typedParams instanceof JsonRpcRawParamsDecoder) {
+                ((JsonRpcRawParamsDecoder) typedParams).decodeRawParams(rawParams);
+            } else if (rawParams != null) {
                 typedParams = JSON.deserialize(JSON.serialize(rawParams), paramsType);
             }
         } catch (Exception ex) {
@@ -251,11 +253,13 @@ public inherited sharing class JsonRpcServiceRuntime {
             return null;
         }
 
-        Object typedResult;
-        try {
-            typedResult = JSON.deserialize(JSON.serialize(rawResult), resultType);
-        } catch (Exception ex) {
-            throw new InternalErrorException('Unable to serialize handler result into declared result type.');
+        Object typedResult = rawResult;
+        if (!(typedResult instanceof JsonRpcResultBase)) {
+            try {
+                typedResult = JSON.deserialize(JSON.serialize(rawResult), resultType);
+            } catch (Exception ex) {
+                throw new InternalErrorException('Unable to serialize handler result into declared result type.');
+            }
         }
 
         if (!(typedResult instanceof JsonRpcResultBase)) {

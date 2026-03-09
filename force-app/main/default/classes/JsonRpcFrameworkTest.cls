@@ -34,6 +34,44 @@ private class JsonRpcFrameworkTest {
         }
     }
 
+    private class NestedDynamicParams extends JsonRpcParamsBase implements JsonRpcRawParamsDecoder {
+        public Map<String, Object> arguments;
+
+        public void decodeRawParams(Object rawParams) {
+            if (!(rawParams instanceof Map<String, Object>)) {
+                throw new JsonRpcException('params must be an object.');
+            }
+
+            Map<String, Object> rawMap = (Map<String, Object>) rawParams;
+            Object rawArguments = rawMap.get('arguments');
+            if (rawArguments != null && !(rawArguments instanceof Map<String, Object>)) {
+                throw new JsonRpcException('arguments must be an object.');
+            }
+
+            this.arguments = (Map<String, Object>) rawArguments;
+        }
+
+        public override void validate() {
+            if (this.arguments == null || !this.arguments.containsKey('value')) {
+                throw new JsonRpcException('arguments.value is required.');
+            }
+        }
+    }
+
+    private class NestedDynamicResult extends JsonRpcResultBase {
+        public List<Object> items = new List<Object>();
+        public Map<String, Object> meta = new Map<String, Object>();
+
+        public override void validate() {
+            if (this.items == null || this.items.isEmpty()) {
+                throw new JsonRpcException('items must not be empty.');
+            }
+            if (this.meta == null || !this.meta.containsKey('ok')) {
+                throw new JsonRpcException('meta.ok is required.');
+            }
+        }
+    }
+
     private class SumHandler implements JsonRpcMethodHandler {
         public String methodName() {
             return 'math.sum';
@@ -71,6 +109,32 @@ private class JsonRpcFrameworkTest {
         public Object invoke(Object params, JsonRpcInvocationContext context) {
             PingResult result = new PingResult();
             result.status = 'ok';
+            return result;
+        }
+    }
+
+    private class NestedDynamicHandler implements JsonRpcMethodHandler {
+        public String methodName() {
+            return 'debug.nested';
+        }
+
+        public Type paramsType() {
+            return NestedDynamicParams.class;
+        }
+
+        public Type resultType() {
+            return NestedDynamicResult.class;
+        }
+
+        public Object invoke(Object params, JsonRpcInvocationContext context) {
+            NestedDynamicParams typed = (NestedDynamicParams) params;
+            NestedDynamicResult result = new NestedDynamicResult();
+            result.items.add(new Map<String, Object>{
+                'type' => 'text',
+                'text' => 'value=' + String.valueOf(typed.arguments.get('value'))
+            });
+            result.meta.put('ok', true);
+            result.meta.put('method', context.methodName);
             return result;
         }
     }
@@ -166,6 +230,7 @@ private class JsonRpcFrameworkTest {
         public override void configure(JsonRpcModule module) {
             module.register(new SumHandler());
             module.register(new PingHandler());
+            module.register(new NestedDynamicHandler());
             module.register(new ThrowingHandler());
             module.register(new BadResultHandler());
             module.register(new DomainThrowingHandler());
@@ -252,6 +317,63 @@ private class JsonRpcFrameworkTest {
 
         JsonRpcExecutionResult badDto = JsonRpcServiceRuntime.execute('{"jsonrpc":"2.0","method":"math.sum","params":{"a":1},"id":2}', module);
         System.assertEquals(JsonRpcConstants.INVALID_PARAMS_CODE, badDto.responses[0].error.code);
+    }
+
+    @IsTest
+    static void testNestedDynamicParamsAndResultSingleRequest() {
+        JsonRpcModule module = new TestModuleBuilder().build();
+
+        JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute(
+            '{"jsonrpc":"2.0","method":"debug.nested","params":{"arguments":{"value":"abc"}},"id":1}',
+            module
+        );
+
+        System.assertEquals(true, execResult.hasResponse);
+        System.assertEquals(false, execResult.responses[0].hasError);
+        NestedDynamicResult typedResult = (NestedDynamicResult) execResult.responses[0].result;
+        System.assertEquals(true, typedResult.meta.get('ok'));
+
+        Map<String, Object> parsed = (Map<String, Object>) JSON.deserializeUntyped(execResult.toJson());
+        Map<String, Object> parsedResult = (Map<String, Object>) parsed.get('result');
+        List<Object> items = (List<Object>) parsedResult.get('items');
+        Map<String, Object> firstItem = (Map<String, Object>) items[0];
+        Map<String, Object> meta = (Map<String, Object>) parsedResult.get('meta');
+        System.assertEquals('value=abc', firstItem.get('text'));
+        System.assertEquals(true, meta.get('ok'));
+        System.assertEquals('debug.nested', meta.get('method'));
+    }
+
+    @IsTest
+    static void testNestedDynamicParamsAndResultBatchRequest() {
+        JsonRpcModule module = new TestModuleBuilder().build();
+
+        JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute(
+            '[{"jsonrpc":"2.0","method":"debug.nested","params":{"arguments":{"value":"batch"}},"id":2}]',
+            module
+        );
+
+        System.assertEquals(true, execResult.isBatch);
+        System.assertEquals(true, execResult.hasResponse);
+        System.assertEquals(1, execResult.responses.size());
+
+        List<Object> parsed = (List<Object>) JSON.deserializeUntyped(execResult.toJson());
+        Map<String, Object> response = (Map<String, Object>) parsed[0];
+        Map<String, Object> result = (Map<String, Object>) response.get('result');
+        List<Object> items = (List<Object>) result.get('items');
+        Map<String, Object> firstItem = (Map<String, Object>) items[0];
+        System.assertEquals('value=batch', firstItem.get('text'));
+    }
+
+    @IsTest
+    static void testNestedDynamicParamsValidationMapsToInvalidParams() {
+        JsonRpcModule module = new TestModuleBuilder().build();
+
+        JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute(
+            '{"jsonrpc":"2.0","method":"debug.nested","params":{"arguments":{}},"id":3}',
+            module
+        );
+
+        System.assertEquals(JsonRpcConstants.INVALID_PARAMS_CODE, execResult.responses[0].error.code);
     }
 
     @IsTest
