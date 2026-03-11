@@ -9,7 +9,7 @@ public inherited sharing class JsonRpcResponse {
     /** Error payload for failed responses. */
     public JsonRpcError error;
     /** Request id correlated to this response. */
-    public Object id;
+    public JsonRpcIdValue id = JsonRpcIdValue.nullId();
 
     /** True when result is present in this response. */
     public Boolean hasResult = false;
@@ -23,9 +23,9 @@ public inherited sharing class JsonRpcResponse {
      * @param responseResult Method result payload.
      * @return Successful JSON-RPC response.
      */
-    public static JsonRpcResponse success(Object requestId, Object responseResult) {
+    public static JsonRpcResponse success(JsonRpcIdValue requestId, Object responseResult) {
         JsonRpcResponse response = new JsonRpcResponse();
-        response.id = requestId;
+        response.id = normalizeId(requestId);
         response.result = responseResult;
         response.hasResult = true;
         response.hasError = false;
@@ -39,9 +39,9 @@ public inherited sharing class JsonRpcResponse {
      * @param responseError JSON-RPC error object.
      * @return Failed JSON-RPC response.
      */
-    public static JsonRpcResponse failure(Object requestId, JsonRpcError responseError) {
+    public static JsonRpcResponse failure(JsonRpcIdValue requestId, JsonRpcError responseError) {
         JsonRpcResponse response = new JsonRpcResponse();
-        response.id = requestId;
+        response.id = normalizeId(requestId);
         response.error = responseError;
         response.hasResult = false;
         response.hasError = true;
@@ -52,16 +52,14 @@ public inherited sharing class JsonRpcResponse {
      * Validates protocol-level response constraints.
      */
     public void validate() {
+        this.id = normalizeId(this.id);
+
         if (this.jsonrpc != JsonRpcConstants.VERSION) {
             throw new JsonRpcException('jsonrpc must be exactly "2.0".');
         }
 
         if (this.hasResult == this.hasError) {
             throw new JsonRpcException('response must include exactly one of result or error.');
-        }
-
-        if (!JsonRpcId.isSupported(this.id)) {
-            throw new JsonRpcException('response id must be String, Integer, Long, Decimal, or null.');
         }
 
         if (this.hasError) {
@@ -82,7 +80,7 @@ public inherited sharing class JsonRpcResponse {
 
         Map<String, Object> raw = new Map<String, Object>{
             'jsonrpc' => this.jsonrpc,
-            'id' => this.id
+            'id' => this.id.toRaw()
         };
 
         if (this.hasResult) {
@@ -114,7 +112,7 @@ public inherited sharing class JsonRpcResponse {
         }
 
         parsed.jsonrpc = (String) raw.get('jsonrpc');
-        parsed.id = raw.get('id');
+        parsed.id = JsonRpcIdValue.fromRaw(raw.get('id'));
         parsed.hasResult = raw.containsKey('result');
         parsed.result = raw.get('result');
 
@@ -148,5 +146,9 @@ public inherited sharing class JsonRpcResponse {
 
         parsed.validate();
         return parsed;
+    }
+
+    private static JsonRpcIdValue normalizeId(JsonRpcIdValue requestId) {
+        return requestId == null ? JsonRpcIdValue.nullId() : requestId;
     }
 }

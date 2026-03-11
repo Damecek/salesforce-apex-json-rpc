@@ -35,7 +35,7 @@ public inherited sharing class JsonRpcServiceRuntime {
     private class RequestEnvelope {
         public String method;
         public Object params;
-        public Object id;
+        public JsonRpcIdValue id = JsonRpcIdValue.nullId();
         public Boolean hasId;
     }
 
@@ -72,7 +72,7 @@ public inherited sharing class JsonRpcServiceRuntime {
         JsonRpcExecutionResult result = new JsonRpcExecutionResult();
 
         if (String.isBlank(requestJson)) {
-            result.responses.add(JsonRpcResponse.failure(null, JsonRpcError.parseError('Request JSON is empty.')));
+            result.responses.add(JsonRpcResponse.failure(JsonRpcIdValue.nullId(), JsonRpcError.parseError('Request JSON is empty.')));
             result.hasResponse = true;
             return result;
         }
@@ -81,7 +81,7 @@ public inherited sharing class JsonRpcServiceRuntime {
         try {
             raw = JSON.deserializeUntyped(requestJson);
         } catch (Exception ex) {
-            result.responses.add(JsonRpcResponse.failure(null, mapper.mapException(new ParseFailureException(ex.getMessage()), null)));
+            result.responses.add(JsonRpcResponse.failure(JsonRpcIdValue.nullId(), mapper.mapException(new ParseFailureException(ex.getMessage()), null)));
             result.hasResponse = true;
             return result;
         }
@@ -97,7 +97,7 @@ public inherited sharing class JsonRpcServiceRuntime {
             List<Object> items = (List<Object>) raw;
 
             if (items.isEmpty()) {
-                result.responses.add(JsonRpcResponse.failure(null, mapper.mapException(new InvalidRequestException('Batch request must not be empty.'), null)));
+                result.responses.add(JsonRpcResponse.failure(JsonRpcIdValue.nullId(), mapper.mapException(new InvalidRequestException('Batch request must not be empty.'), null)));
                 result.hasResponse = true;
                 return result;
             }
@@ -105,7 +105,7 @@ public inherited sharing class JsonRpcServiceRuntime {
             Integer index = 0;
             for (Object item : items) {
                 if (!(item instanceof Map<String, Object>)) {
-                    result.responses.add(JsonRpcResponse.failure(null, mapper.mapException(new InvalidRequestException('Each batch item must be an object.'), null)));
+                    result.responses.add(JsonRpcResponse.failure(JsonRpcIdValue.nullId(), mapper.mapException(new InvalidRequestException('Each batch item must be an object.'), null)));
                     index++;
                     continue;
                 }
@@ -118,7 +118,7 @@ public inherited sharing class JsonRpcServiceRuntime {
             return result;
         }
 
-        result.responses.add(JsonRpcResponse.failure(null, mapper.mapException(new InvalidRequestException('Request payload must be an object or an array.'), null)));
+        result.responses.add(JsonRpcResponse.failure(JsonRpcIdValue.nullId(), mapper.mapException(new InvalidRequestException('Request payload must be an object or an array.'), null)));
         result.hasResponse = true;
         return result;
     }
@@ -134,7 +134,7 @@ public inherited sharing class JsonRpcServiceRuntime {
         try {
             envelope = parseEnvelope(requestMap);
         } catch (Exception ex) {
-            Object idForError = extractSupportedId(requestMap);
+            JsonRpcIdValue idForError = extractSupportedId(requestMap);
             result.responses.add(JsonRpcResponse.failure(idForError, mapper.mapException(ex, null)));
             return;
         }
@@ -153,9 +153,9 @@ public inherited sharing class JsonRpcServiceRuntime {
         JsonRpcInvocationContext context = newContext(envelope, requestMap, batchIndex);
 
         try {
-            Object typedParams = deserializeParams(envelope.params, handler.paramsType());
-            Object rawResult = handler.invoke(typedParams, context);
-            Object typedResult = coerceResult(rawResult, handler.resultType());
+            JsonRpcParamsBase typedParams = deserializeParams(envelope.params, handler.paramsType());
+            JsonRpcResultBase rawResult = handler.invoke(typedParams, context);
+            JsonRpcResultBase typedResult = coerceResult(rawResult, handler.resultType());
 
             if (envelope.hasId) {
                 result.responses.add(JsonRpcResponse.success(envelope.id, typedResult));
@@ -196,10 +196,12 @@ public inherited sharing class JsonRpcServiceRuntime {
         envelope.method = methodName;
         envelope.params = requestMap.get('params');
         envelope.hasId = requestMap.containsKey('id');
-        envelope.id = requestMap.get('id');
-
-        if (envelope.hasId && !JsonRpcId.isSupported(envelope.id)) {
-            throw new InvalidRequestException('id must be String, Integer, Long, Decimal, or null.');
+        if (envelope.hasId) {
+            try {
+                envelope.id = JsonRpcIdValue.fromRaw(requestMap.get('id'));
+            } catch (JsonRpcException ex) {
+                throw new InvalidRequestException(ex.getMessage());
+            }
         }
 
         return envelope;
@@ -208,77 +210,87 @@ public inherited sharing class JsonRpcServiceRuntime {
     private static JsonRpcInvocationContext newContext(RequestEnvelope envelope, Map<String, Object> requestMap, Integer batchIndex) {
         JsonRpcInvocationContext context = new JsonRpcInvocationContext();
         context.requestId = envelope.id;
+        context.hasRequestId = envelope.hasId;
         context.methodName = envelope.method;
         context.rawRequest = requestMap;
         context.batchIndex = batchIndex;
         return context;
     }
 
-    private static Object deserializeParams(Object rawParams, Type paramsType) {
+    private static JsonRpcParamsBase deserializeParams(Object rawParams, Type paramsType) {
         if (paramsType == null) {
             throw new InvalidRequestException('handler paramsType() must return a type.');
         }
 
-        Object typedParams;
+        Object paramsProbe;
         try {
-            typedParams = paramsType.newInstance();
-
-            if (typedParams instanceof JsonRpcRawParamsDecoder) {
-                ((JsonRpcRawParamsDecoder) typedParams).decodeRawParams(rawParams);
-            } else if (rawParams != null) {
-                typedParams = JSON.deserialize(JSON.serialize(rawParams), paramsType);
-            }
+            paramsProbe = paramsType.newInstance();
         } catch (Exception ex) {
-            throw new InvalidParamsException('Unable to deserialize params for declared params type.');
+            throw new InvalidRequestException('Declared params type must be instantiable.');
         }
 
-        if (!(typedParams instanceof JsonRpcParamsBase)) {
+        if (!(paramsProbe instanceof JsonRpcParamsBase)) {
             throw new InvalidRequestException('Declared params type must extend JsonRpcParamsBase.');
         }
 
+        JsonRpcParamsBase typedParams = (JsonRpcParamsBase) paramsProbe;
+        if (rawParams != null) {
+            try {
+                typedParams = (JsonRpcParamsBase) JSON.deserialize(JSON.serialize(rawParams), paramsType);
+            } catch (Exception ex) {
+                throw new InvalidParamsException('Unable to deserialize params for declared params type.');
+            }
+        }
+
         try {
-            ((JsonRpcParamsBase) typedParams).validate();
+            typedParams.validate();
         } catch (Exception ex) {
             throw new InvalidParamsException('Params validation failed for declared params type.');
         }
         return typedParams;
     }
 
-    private static Object coerceResult(Object rawResult, Type resultType) {
+    private static JsonRpcResultBase coerceResult(JsonRpcResultBase rawResult, Type resultType) {
         if (resultType == null) {
             throw new InternalErrorException('handler resultType() must return a type.');
+        }
+
+        Object resultProbe;
+        try {
+            resultProbe = resultType.newInstance();
+        } catch (Exception ex) {
+            throw new InternalErrorException('Declared result type must be instantiable.');
+        }
+
+        if (!(resultProbe instanceof JsonRpcResultBase)) {
+            throw new InternalErrorException('Declared result type must extend JsonRpcResultBase.');
         }
 
         if (rawResult == null) {
             return null;
         }
 
-        Object typedResult = rawResult;
-        if (!(typedResult instanceof JsonRpcResultBase)) {
-            try {
-                typedResult = JSON.deserialize(JSON.serialize(rawResult), resultType);
-            } catch (Exception ex) {
-                throw new InternalErrorException('Unable to serialize handler result into declared result type.');
-            }
-        }
-
-        if (!(typedResult instanceof JsonRpcResultBase)) {
-            throw new InternalErrorException('Declared result type must extend JsonRpcResultBase.');
+        JsonRpcResultBase typedResult;
+        try {
+            typedResult = (JsonRpcResultBase) JSON.deserialize(JSON.serialize(rawResult), resultType);
+        } catch (Exception ex) {
+            throw new InternalErrorException('Unable to serialize handler result into declared result type.');
         }
 
         try {
-            ((JsonRpcResultBase) typedResult).validate();
+            typedResult.validate();
         } catch (Exception ex) {
             throw new InternalErrorException('Result validation failed for declared result type.');
         }
         return typedResult;
     }
 
-    private static Object extractSupportedId(Map<String, Object> requestMap) {
+    private static JsonRpcIdValue extractSupportedId(Map<String, Object> requestMap) {
         if (requestMap == null || !requestMap.containsKey('id')) {
-            return null;
+            return JsonRpcIdValue.nullId();
         }
 
-        return JsonRpcId.normalizedOrNull(requestMap.get('id'));
+        JsonRpcIdValue parsedId = JsonRpcIdValue.tryFromRaw(requestMap.get('id'));
+        return parsedId == null ? JsonRpcIdValue.nullId() : parsedId;
     }
 }

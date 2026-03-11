@@ -34,58 +34,56 @@ private class JsonRpcFrameworkTest {
         }
     }
 
-    private class NestedDynamicParams extends JsonRpcParamsBase implements JsonRpcRawParamsDecoder {
-        public Map<String, Object> arguments;
+    private class NestedArguments {
+        public String value;
+    }
 
-        public void decodeRawParams(Object rawParams) {
-            if (!(rawParams instanceof Map<String, Object>)) {
-                throw new JsonRpcException('params must be an object.');
-            }
-
-            Map<String, Object> rawMap = (Map<String, Object>) rawParams;
-            Object rawArguments = rawMap.get('arguments');
-            if (rawArguments != null && !(rawArguments instanceof Map<String, Object>)) {
-                throw new JsonRpcException('arguments must be an object.');
-            }
-
-            this.arguments = (Map<String, Object>) rawArguments;
-        }
+    private class NestedTypedParams extends JsonRpcParamsBase {
+        public NestedArguments arguments;
 
         public override void validate() {
-            if (this.arguments == null || !this.arguments.containsKey('value')) {
+            if (this.arguments == null || String.isBlank(this.arguments.value)) {
                 throw new JsonRpcException('arguments.value is required.');
             }
         }
     }
 
-    private class NestedDynamicResult extends JsonRpcResultBase {
-        public List<Object> items = new List<Object>();
-        public Map<String, Object> meta = new Map<String, Object>();
+    private class NestedTypedResult extends JsonRpcResultBase {
+        public String text;
+        public Boolean ok;
+        public String method;
 
         public override void validate() {
-            if (this.items == null || this.items.isEmpty()) {
-                throw new JsonRpcException('items must not be empty.');
+            if (String.isBlank(this.text)) {
+                throw new JsonRpcException('text is required.');
             }
-            if (this.meta == null || !this.meta.containsKey('ok')) {
-                throw new JsonRpcException('meta.ok is required.');
+            if (this.ok == null) {
+                throw new JsonRpcException('ok is required.');
+            }
+            if (String.isBlank(this.method)) {
+                throw new JsonRpcException('method is required.');
             }
         }
     }
 
-    private class SumHandler implements JsonRpcMethodHandler {
-        public String methodName() {
-            return 'math.sum';
+    private class IdEchoResult extends JsonRpcResultBase {
+        public Boolean hadId;
+        public Boolean idWasNull;
+        public String idString;
+
+        public override void validate() {
+            if (this.hadId == null || this.idWasNull == null) {
+                throw new JsonRpcException('id flags are required.');
+            }
+        }
+    }
+
+    private class SumHandler extends JsonRpcMethodHandler {
+        public SumHandler() {
+            super('math.sum', SumParams.class, SumResult.class);
         }
 
-        public Type paramsType() {
-            return SumParams.class;
-        }
-
-        public Type resultType() {
-            return SumResult.class;
-        }
-
-        public Object invoke(Object params, JsonRpcInvocationContext context) {
+        public override JsonRpcResultBase invoke(JsonRpcParamsBase params, JsonRpcInvocationContext context) {
             SumParams typed = (SumParams) params;
             SumResult result = new SumResult();
             result.sum = typed.a + typed.b;
@@ -93,103 +91,76 @@ private class JsonRpcFrameworkTest {
         }
     }
 
-    private class PingHandler implements JsonRpcMethodHandler {
-        public String methodName() {
-            return 'system.ping';
+    private class PingHandler extends JsonRpcMethodHandler {
+        public PingHandler() {
+            super('system.ping', PingParams.class, PingResult.class);
         }
 
-        public Type paramsType() {
-            return PingParams.class;
-        }
-
-        public Type resultType() {
-            return PingResult.class;
-        }
-
-        public Object invoke(Object params, JsonRpcInvocationContext context) {
+        public override JsonRpcResultBase invoke(JsonRpcParamsBase params, JsonRpcInvocationContext context) {
             PingResult result = new PingResult();
             result.status = 'ok';
             return result;
         }
     }
 
-    private class NestedDynamicHandler implements JsonRpcMethodHandler {
-        public String methodName() {
-            return 'debug.nested';
+    private class NestedTypedHandler extends JsonRpcMethodHandler {
+        public NestedTypedHandler() {
+            super('debug.nested', NestedTypedParams.class, NestedTypedResult.class);
         }
 
-        public Type paramsType() {
-            return NestedDynamicParams.class;
-        }
-
-        public Type resultType() {
-            return NestedDynamicResult.class;
-        }
-
-        public Object invoke(Object params, JsonRpcInvocationContext context) {
-            NestedDynamicParams typed = (NestedDynamicParams) params;
-            NestedDynamicResult result = new NestedDynamicResult();
-            result.items.add(new Map<String, Object>{
-                'type' => 'text',
-                'text' => 'value=' + String.valueOf(typed.arguments.get('value'))
-            });
-            result.meta.put('ok', true);
-            result.meta.put('method', context.methodName);
+        public override JsonRpcResultBase invoke(JsonRpcParamsBase params, JsonRpcInvocationContext context) {
+            NestedTypedParams typed = (NestedTypedParams) params;
+            NestedTypedResult result = new NestedTypedResult();
+            result.text = 'value=' + typed.arguments.value;
+            result.ok = true;
+            result.method = context.methodName;
             return result;
         }
     }
 
-    private class ThrowingHandler implements JsonRpcMethodHandler {
-        public String methodName() {
-            return 'system.explode';
+    private class IdEchoHandler extends JsonRpcMethodHandler {
+        public IdEchoHandler() {
+            super('debug.idEcho', PingParams.class, IdEchoResult.class);
         }
 
-        public Type paramsType() {
-            return PingParams.class;
+        public override JsonRpcResultBase invoke(JsonRpcParamsBase params, JsonRpcInvocationContext context) {
+            IdEchoResult result = new IdEchoResult();
+            result.hadId = context.hasRequestId;
+            result.idWasNull = context.requestId.isNull();
+            result.idString = context.requestId.isNull() ? null : String.valueOf(context.requestId.toRaw());
+            return result;
+        }
+    }
+
+    private class ThrowingHandler extends JsonRpcMethodHandler {
+        public ThrowingHandler() {
+            super('system.explode', PingParams.class, PingResult.class);
         }
 
-        public Type resultType() {
-            return PingResult.class;
-        }
-
-        public Object invoke(Object params, JsonRpcInvocationContext context) {
+        public override JsonRpcResultBase invoke(JsonRpcParamsBase params, JsonRpcInvocationContext context) {
             Integer x = 1 / 0;
             return null;
         }
     }
 
-    private class BadResultHandler implements JsonRpcMethodHandler {
-        public String methodName() {
-            return 'system.badResult';
+    private class BadResultHandler extends JsonRpcMethodHandler {
+        public BadResultHandler() {
+            super('system.badResult', PingParams.class, SumResult.class);
         }
 
-        public Type paramsType() {
-            return PingParams.class;
-        }
-
-        public Type resultType() {
-            return SumResult.class;
-        }
-
-        public Object invoke(Object params, JsonRpcInvocationContext context) {
-            return new Map<String, Object>{ 'unexpected' => true };
+        public override JsonRpcResultBase invoke(JsonRpcParamsBase params, JsonRpcInvocationContext context) {
+            PingResult result = new PingResult();
+            result.status = 'unexpected';
+            return result;
         }
     }
 
-    private class JsonRpcExceptionThrowingHandler implements JsonRpcMethodHandler {
-        public String methodName() {
-            return 'system.throwJsonRpc';
+    private class JsonRpcExceptionThrowingHandler extends JsonRpcMethodHandler {
+        public JsonRpcExceptionThrowingHandler() {
+            super('system.throwJsonRpc', PingParams.class, PingResult.class);
         }
 
-        public Type paramsType() {
-            return PingParams.class;
-        }
-
-        public Type resultType() {
-            return PingResult.class;
-        }
-
-        public Object invoke(Object params, JsonRpcInvocationContext context) {
+        public override JsonRpcResultBase invoke(JsonRpcParamsBase params, JsonRpcInvocationContext context) {
             throw new JsonRpcException('handler-signaled-error');
         }
     }
@@ -197,20 +168,12 @@ private class JsonRpcFrameworkTest {
     private class DomainException extends Exception {
     }
 
-    private class DomainThrowingHandler implements JsonRpcMethodHandler {
-        public String methodName() {
-            return 'domain.fail';
+    private class DomainThrowingHandler extends JsonRpcMethodHandler {
+        public DomainThrowingHandler() {
+            super('domain.fail', PingParams.class, PingResult.class);
         }
 
-        public Type paramsType() {
-            return PingParams.class;
-        }
-
-        public Type resultType() {
-            return PingResult.class;
-        }
-
-        public Object invoke(Object params, JsonRpcInvocationContext context) {
+        public override JsonRpcResultBase invoke(JsonRpcParamsBase params, JsonRpcInvocationContext context) {
             throw new DomainException('domain-fail');
         }
     }
@@ -230,7 +193,8 @@ private class JsonRpcFrameworkTest {
         public override void configure(JsonRpcModule module) {
             module.register(new SumHandler());
             module.register(new PingHandler());
-            module.register(new NestedDynamicHandler());
+            module.register(new NestedTypedHandler());
+            module.register(new IdEchoHandler());
             module.register(new ThrowingHandler());
             module.register(new BadResultHandler());
             module.register(new DomainThrowingHandler());
@@ -248,6 +212,7 @@ private class JsonRpcFrameworkTest {
         System.assertEquals(false, execResult.isBatch);
         System.assertEquals(1, execResult.responses.size());
         System.assertEquals(false, execResult.responses[0].hasError);
+        System.assertEquals('1', String.valueOf(execResult.responses[0].id.toRaw()));
 
         SumResult typedResult = (SumResult) execResult.responses[0].result;
         System.assertEquals(5, typedResult.sum);
@@ -267,6 +232,34 @@ private class JsonRpcFrameworkTest {
         System.assertEquals(false, execResult.hasResponse);
         System.assertEquals(0, execResult.responses.size());
         System.assertEquals(null, execResult.toJson());
+    }
+
+    @IsTest
+    static void testExplicitNullIdProducesResponse() {
+        JsonRpcModule module = new TestModuleBuilder().build();
+
+        JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute(
+            '{"jsonrpc":"2.0","method":"system.ping","params":{},"id":null}',
+            module
+        );
+
+        System.assertEquals(true, execResult.hasResponse);
+        System.assertEquals(true, execResult.responses[0].id.isNull());
+    }
+
+    @IsTest
+    static void testIdEchoTracksNullIdInContext() {
+        JsonRpcModule module = new TestModuleBuilder().build();
+
+        JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute(
+            '{"jsonrpc":"2.0","method":"debug.idEcho","params":{},"id":null}',
+            module
+        );
+
+        IdEchoResult typedResult = (IdEchoResult) execResult.responses[0].result;
+        System.assertEquals(true, typedResult.hadId);
+        System.assertEquals(true, typedResult.idWasNull);
+        System.assertEquals(null, typedResult.idString);
     }
 
     @IsTest
@@ -305,7 +298,7 @@ private class JsonRpcFrameworkTest {
         JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute('{"jsonrpc":"2.0","method":"math.unknown","id":9}', module);
 
         System.assertEquals(JsonRpcConstants.METHOD_NOT_FOUND_CODE, execResult.responses[0].error.code);
-        System.assertEquals(9, execResult.responses[0].id);
+        System.assertEquals('9', String.valueOf(execResult.responses[0].id.toRaw()));
     }
 
     @IsTest
@@ -320,7 +313,7 @@ private class JsonRpcFrameworkTest {
     }
 
     @IsTest
-    static void testNestedDynamicParamsAndResultSingleRequest() {
+    static void testTypedNestedParamsAndResultSingleRequest() {
         JsonRpcModule module = new TestModuleBuilder().build();
 
         JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute(
@@ -330,21 +323,19 @@ private class JsonRpcFrameworkTest {
 
         System.assertEquals(true, execResult.hasResponse);
         System.assertEquals(false, execResult.responses[0].hasError);
-        NestedDynamicResult typedResult = (NestedDynamicResult) execResult.responses[0].result;
-        System.assertEquals(true, typedResult.meta.get('ok'));
+        NestedTypedResult typedResult = (NestedTypedResult) execResult.responses[0].result;
+        System.assertEquals(true, typedResult.ok);
+        System.assertEquals('value=abc', typedResult.text);
 
         Map<String, Object> parsed = (Map<String, Object>) JSON.deserializeUntyped(execResult.toJson());
         Map<String, Object> parsedResult = (Map<String, Object>) parsed.get('result');
-        List<Object> items = (List<Object>) parsedResult.get('items');
-        Map<String, Object> firstItem = (Map<String, Object>) items[0];
-        Map<String, Object> meta = (Map<String, Object>) parsedResult.get('meta');
-        System.assertEquals('value=abc', firstItem.get('text'));
-        System.assertEquals(true, meta.get('ok'));
-        System.assertEquals('debug.nested', meta.get('method'));
+        System.assertEquals('value=abc', parsedResult.get('text'));
+        System.assertEquals(true, parsedResult.get('ok'));
+        System.assertEquals('debug.nested', parsedResult.get('method'));
     }
 
     @IsTest
-    static void testNestedDynamicParamsAndResultBatchRequest() {
+    static void testTypedNestedParamsAndResultBatchRequest() {
         JsonRpcModule module = new TestModuleBuilder().build();
 
         JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute(
@@ -359,13 +350,11 @@ private class JsonRpcFrameworkTest {
         List<Object> parsed = (List<Object>) JSON.deserializeUntyped(execResult.toJson());
         Map<String, Object> response = (Map<String, Object>) parsed[0];
         Map<String, Object> result = (Map<String, Object>) response.get('result');
-        List<Object> items = (List<Object>) result.get('items');
-        Map<String, Object> firstItem = (Map<String, Object>) items[0];
-        System.assertEquals('value=batch', firstItem.get('text'));
+        System.assertEquals('value=batch', result.get('text'));
     }
 
     @IsTest
-    static void testNestedDynamicParamsValidationMapsToInvalidParams() {
+    static void testTypedNestedParamsValidationMapsToInvalidParams() {
         JsonRpcModule module = new TestModuleBuilder().build();
 
         JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute(
@@ -427,7 +416,7 @@ private class JsonRpcFrameworkTest {
 
             System.assertEquals(true, response.hasError);
             System.assertEquals(false, response.hasResult);
-            System.assertEquals(expectedId, response.id);
+            System.assertEquals(String.valueOf(expectedId), String.valueOf(response.id.toRaw()));
             System.assertEquals(JsonRpcConstants.METHOD_NOT_FOUND_CODE, response.error.code);
         }
 
@@ -499,13 +488,13 @@ private class JsonRpcFrameworkTest {
         JsonRpcExecutionResult execResult = JsonRpcServiceRuntime.execute('{"jsonrpc":"2.0","method":"math.sum","params":{"a":1,"b":2},"id":true}', module);
 
         System.assertEquals(JsonRpcConstants.INVALID_REQUEST_CODE, execResult.responses[0].error.code);
-        System.assertEquals(null, execResult.responses[0].id);
+        System.assertEquals(true, execResult.responses[0].id.isNull());
     }
 
     @IsTest
     static void testResponseValidationExactlyOneOfResultOrError() {
         JsonRpcResponse response = new JsonRpcResponse();
-        response.id = 1;
+        response.id = JsonRpcIdValue.fromRaw(1);
         response.hasResult = true;
         response.result = 'ok';
         response.hasError = true;

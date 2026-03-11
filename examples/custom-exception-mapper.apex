@@ -8,18 +8,18 @@ public class ExampleFailResult extends JsonRpcResultBase {
     public String status;
 }
 
-public class ExampleFailHandler implements JsonRpcMethodHandler {
-    public String methodName() { return 'domain.fail'; }
-    public Type paramsType() { return ExampleFailParams.class; }
-    public Type resultType() { return ExampleFailResult.class; }
+public class ExampleFailHandler extends JsonRpcMethodHandler {
+    public ExampleFailHandler() {
+        super('domain.fail', ExampleFailParams.class, ExampleFailResult.class);
+    }
 
-    public Object invoke(Object params, JsonRpcInvocationContext context) {
+    public override JsonRpcResultBase invoke(JsonRpcParamsBase params, JsonRpcInvocationContext context) {
         throw new DomainFailureException('rule failed');
     }
 }
 
 public class ExampleMapper implements JsonRpcExceptionMapper {
-    public JsonRpcError map(Exception ex, JsonRpcInvocationContext context) {
+    public JsonRpcError mapException(Exception ex, JsonRpcInvocationContext context) {
         if (ex instanceof DomainFailureException) {
             return new JsonRpcError(12001, 'Domain failure', new Map<String, Object>{
                 'method' => context.methodName

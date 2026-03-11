@@ -23,6 +23,10 @@ Override is explicit: `npm run task:prepare:skip-org`.
 ## Engineering Rules
 - Keep public API minimal and intuitive.
 - Follow JSON-RPC 2.0 spec strictly.
+- Prefer class-first DTO modeling for params and results.
+- Limit `Object`, `Map<String, Object>`, and `List<Object>` to JSON protocol boundaries only.
+- Use wrapper value objects for protocol fields with multiple allowed scalar types, beginning with JSON-RPC `id`.
+- Avoid new public extension points that bypass typed DTO deserialization.
 - Add/update tests with every behavior change.
 - Keep ApexDoc complete and accurate for every public API class, method, and field.
 - Keep docs concise and executable.

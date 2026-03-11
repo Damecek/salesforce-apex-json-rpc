@@ -14,12 +14,12 @@ public class ExampleSumResult extends JsonRpcResultBase {
     public Integer sum;
 }
 
-public class ExampleSumHandler implements JsonRpcMethodHandler {
-    public String methodName() { return 'math.sum'; }
-    public Type paramsType() { return ExampleSumParams.class; }
-    public Type resultType() { return ExampleSumResult.class; }
+public class ExampleSumHandler extends JsonRpcMethodHandler {
+    public ExampleSumHandler() {
+        super('math.sum', ExampleSumParams.class, ExampleSumResult.class);
+    }
 
-    public Object invoke(Object params, JsonRpcInvocationContext context) {
+    public override JsonRpcResultBase invoke(JsonRpcParamsBase params, JsonRpcInvocationContext context) {
         ExampleSumParams p = (ExampleSumParams) params;
         ExampleSumResult r = new ExampleSumResult();
         r.sum = p.a + p.b;

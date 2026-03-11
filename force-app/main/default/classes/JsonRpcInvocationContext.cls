@@ -3,7 +3,9 @@
  */
 public inherited sharing class JsonRpcInvocationContext {
     /** Request id from incoming payload. */
-    public Object requestId;
+    public JsonRpcIdValue requestId = JsonRpcIdValue.nullId();
+    /** True when the request contained an id member. */
+    public Boolean hasRequestId = false;
     /** JSON-RPC method name. */
     public String methodName;
     /** Raw untyped request envelope map. */
